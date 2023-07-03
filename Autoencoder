@@ -1,0 +1,133 @@
+import torch
+import torch.nn as nn
+import torchvision.datasets as dset
+import torchvision.transforms as transforms
+import torch.optim as optim
+import matplotlib.pyplot as plt
+import numpy as np
+
+# For repeatability
+torch.manual_seed(123)
+# Folder where the data to be process is stored
+dataroot=r'C:\Users\taken_out\for_privacy_reasons'
+# Side size for the data to be resized to before starting
+image_size=250
+# Size of each batch
+batch_size=8
+# Resizing, normalizing and turning data into tensors
+dataset = dset.ImageFolder(root=dataroot,
+                           transform=transforms.Compose([
+                               transforms.Resize(image_size),
+                               transforms.CenterCrop(image_size),
+                               transforms.ToTensor(),
+                               transforms.Normalize([0.5, 0.5,0.5],[0.5,0.5,0.5]),
+                           ]))
+# Creating batches
+dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+                                         shuffle=True, num_workers=2)
+# Transform inverse
+inv_transform=transforms.Compose([ transforms.Normalize(mean = [ 0., 0., 0. ],
+                                                     std = [ 2, 2, 2 ]),
+                                transforms.Normalize(mean = [ -0.5, -0.5, -0.5 ],
+                                                     std = [ 1., 1., 1. ]),
+                               ])
+# Initializing the weights with a mean of 0 and standard deviation of 0.02
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        nn.init.normal_(m.weight.data, 0.0, 0.02)
+    elif classname.find('BatchNorm') != -1:
+        nn.init.normal_(m.weight.data, 1.0, 0.02)
+        nn.init.constant_(m.bias.data, 0)
+# 1 for Grayscale and 3 for coloured pictures
+no_colours=3
+# Number of channels for convolution layers
+no_channels1=10
+no_channels_end=3
+# Referring to first, second or third layer's k=kernel side size, s=stride, p=padding
+l1k, l1s, l1p =4,1,0
+l2k, l2s, l2p =3,1,0
+l3k, l3s, l3p =3,1,0
+
+# Creating an encoder class which will compress the images
+class Encoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # Neural network
+        self.main=nn.Sequential (
+            nn.Conv2d( no_colours, no_channels1 , kernel_size=l1k, stride=l1s, padding=l1p, bias=False), 
+            nn.BatchNorm2d(no_channels1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d( no_channels1, no_channels1 , kernel_size=l2k, stride=l2s, padding=l2p, bias=False),
+            nn.BatchNorm2d(no_channels1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(no_channels1 ,no_channels_end , kernel_size=l3k, stride=l3s, padding=l3p, bias=False),
+            nn.Sigmoid()
+        )
+    def forward(self,input):
+        return self.main(input)
+# Creating an encoder
+e=Encoder()
+# Applying the initialization of weights
+e.apply(weights_init)
+
+# Creating a decoder class which will unsqueeze the compressed data
+class Decoder (nn.Module):
+    def __init__(self):
+        super().__init__()
+        # Neural network
+        self.main=nn.Sequential (
+            nn.ConvTranspose2d(no_channels_end , no_channels1,  kernel_size=l3k, stride=l3s, padding=l3p, bias=False),
+            nn.BatchNorm2d(no_channels1),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(no_channels1, no_channels1,  kernel_size=l2k, stride=l2s, padding=l2p, bias=False),
+            nn.BatchNorm2d(no_channels1),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(no_channels1, no_colours, kernel_size=l1k, stride=l1s, padding=l1p, bias=False),
+            nn.Tanh()
+        )  
+    def forward (self,input):
+        return self.main(input)
+# Creating a decoder
+d=Decoder()
+# Applying the initialization of weights
+d.apply(weights_init)
+# Learning rate
+lr=0.001
+# Number of iterations
+epochs=10
+# Mean squared error loss function. Default loss function in Pytorch for regression problems.
+criterion=nn.MSELoss()
+# Setting up Adam optimizers for both the encoder and the decoder
+optimizer_e = optim.Adam(e.parameters(), lr=lr, betas=(0.5, 0.999))
+optimizer_d = optim.Adam(d.parameters(), lr=lr, betas=(0.5, 0.999))
+
+iters=0
+error_list=[]
+iters_list=[]
+
+print('Initializing...')
+# For each iteration
+for epoch in range(epochs):
+    print(f'Starting [{epoch+1}]/[{epochs}]')
+    for i, data in enumerate(dataloader, 0):
+        # Setting gradients to 0
+        optimizer_e.zero_grad()   
+        optimizer_d.zero_grad() 
+        # Calculating the output by squeezing and unsqueezing data
+        output=d(e(data[0]))
+        # Comparing the output with the data before being going through the neural networks 
+        error=criterion(output,data[0])
+        # Calculating the gradient
+        error.backward()
+        # Updating the optimizers
+        optimizer_e.step()
+        optimizer_d.step()
+        # Keeping track of the errors
+        if iters%10==0:
+            iters_list.append(iters)
+            error_list.append(error.item())
+            print(f'Current error = {error}')
+        iters+=1
+
+print('Finished')
