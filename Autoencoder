@@ -202,5 +202,8 @@ def compression_quality():
         y_comp=e(final_pictures[0])[i]
         a.append(tensor_size(y_comp)/tensor_size(y)*100)
     return 100-round(np.mean(a),1)
-
-
+##################################################
+# Check the weights of a neural network x
+def check_weights(x):
+    for name, param in x.named_parameters():
+        print (name,param)
