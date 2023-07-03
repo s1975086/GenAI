@@ -131,3 +131,76 @@ for epoch in range(epochs):
         iters+=1
 
 print('Finished')
+
+
+
+
+######################################################### Extras ########################################################################
+# Plots errors over the iterations
+plt.figure(figsize=(10,5))
+plt.title("Autoenconder Loss During Training 3 Layers")
+plt.plot(iters_list, error_list,label='error')
+plt.xlabel("iterations")
+plt.ylabel("Loss")
+plt.legend()
+plt.show()
+##################################################
+# Preparing some data to see the results
+try:
+    if len(final_pictures)==0:
+        breaking=0
+        for i in dataloader:
+            if breaking==True:
+                break
+            final_pictures.append(i[0])
+            breaking=+1
+except:
+    final_pictures=[]
+if len(final_pictures)==0:
+    breaking=0
+    for i in dataloader:
+        if breaking==True:
+            break
+        final_pictures.append(i[0])
+        breaking=+1
+
+# Plots original pictures
+def plot_original():
+    fig = plt.figure(figsize=(9, 9))
+    for i in range(1,final_pictures[0].shape[0]):
+        img2=inv_transform(final_pictures[0][i].detach()).permute(1, 2, 0)
+        fig.add_subplot(2, 4, i)
+        plt.axis(False)
+        plt.imshow(img2.squeeze())
+
+# Plots the images after they go through the neural networks
+def plot_comp():
+    fig = plt.figure(figsize=(9, 9))
+    for i in range(1,d(e(final_pictures[0])).shape[0]):
+        img2=inv_transform(d(e(final_pictures[0]))[i].detach()).permute(1, 2, 0)
+        fig.add_subplot(2, 4, i)
+        plt.axis(False)
+        plt.imshow(img2.squeeze())
+##################################################
+# Check the similarity between each batch
+def similarity():
+    cos = torch.nn.CosineSimilarity(dim=0)
+    list=[]
+    for i in range(len(final_pictures)):
+        y_true=inv_transform(final_pictures[0][i].detach()).permute(1, 2, 0)
+        y_pred=inv_transform(d(e(final_pictures[0]))[i].detach()).permute(1, 2, 0)
+        list.append(torch.mean(cos(y_true,y_pred)))
+    return round(np.mean(list)*100,1)
+##################################################
+# Check how compressed is the data getting
+def tensor_size(x):
+    return x.element_size() * x.nelement()
+def compression_quality():
+    a=[]
+    for i in range(len(final_pictures)):
+        y=final_pictures[0][i]
+        y_comp=e(final_pictures[0])[i]
+        a.append(tensor_size(y_comp)/tensor_size(y)*100)
+    return 100-round(np.mean(a),1)
+
+
