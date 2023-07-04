@@ -211,4 +211,76 @@ for epoch in range(epochs):
 print('Finished')
 
 
+######################################################### Extras ########################################################################
+# Plots the original data, the data after going through the encoder and deocder and the output of random noise going through the system
+fig=plt.figure(figsize=(10,10))
+noise=torch.rand(15,1,image_size,image_size)
+print(noise.shape)
+noise_result=d(e(noise))[10].detach()
+for i,j in dataloader:
+    n=4
+    fig.add_subplot(2, 2, 1)
+    plt.imshow(d(e(i))[n].squeeze().detach(),cmap='gray')
+    plt.axis(False)
+    plt.title('Processed')
+    fig.add_subplot(2, 2, 2)
+    plt.imshow(i[n].squeeze(),cmap='gray')
+    plt.axis(False)
+    plt.title('Original')
+    fig.add_subplot(2, 2, 3)
+    plt.imshow(noise_result.squeeze(),cmap='gray')
+    plt.axis(False)
+    plt.title('Generated')
+    break
+##################################################
+# Labelling and plotting data points in latent space
+from sklearn.manifold import TSNE
+import plotly.express as px
 
+label_dict={0:'0',
+1: '1',
+2: '2',
+3: '3',
+4: '4',
+5: '5',
+6: '6',
+7: '7',
+8: '8',
+9: '9'}
+
+encoded_samples=[]
+encoded_samples_0 = []
+
+labels_group=[]
+labels_group_0=[]
+
+for image, labels in dataloader: 
+
+    img = image
+    img2=e(img).detach()
+    encoded_samples_0.append(img2)
+    labels_group_0.append(labels)
+
+
+for i in encoded_samples_0:
+    for j in i:
+        encoded_samples.append(j)
+
+for i in labels_group_0:
+    for j in i:
+        labels_group.append(label_dict[j.item()])
+
+
+final_list=[]
+it=0
+for i in encoded_samples:
+    sample={f"Enc. Variable {j}": enc for j, enc in enumerate(i)}
+    sample['label'] = labels_group[it]
+    final_list.append(sample)
+    it+=1
+final_list=pd.DataFrame(final_list)
+
+tsne = TSNE() 
+tsne_results = tsne.fit_transform(final_list.drop(['label'],axis=1)) 
+fig = px.scatter(tsne_results, x=0, y=1, color=final_list.label.astype(str),labels={'0': 'tsne-2d-one', '1': 'tsne-2d-two'}) 
+fig.show()
