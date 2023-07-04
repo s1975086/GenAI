@@ -192,7 +192,7 @@ for epoch in range(epochs):
         output=d(e(tensor))
         # Calculating the error between before and after the data is processed
         error2=criterion2(output,tensor.squeeze())
-        # Calculating how different the distributions are to normal
+        # Calculating how different the distributions are to normal for regularization purposes
         error3=criterion(e(tensor),F.log_softmax(torch.normal(0,1,size=(1,s5)),dim=1))
         # Summing the errors
         error=error3+error2
